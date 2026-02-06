@@ -68,7 +68,7 @@ esp32:
   framework:
     type: arduino
 psram:
-  mode: octal
+  mode: quad
   speed: 80MHz
 
 preferences:
