@@ -1,0 +1,18 @@
+# ESPHome Secrets – NIEMALS committen!
+secrets.yaml
+
+# ESPHome Build-Artefakte
+.esphome/
+.pioenvs/
+.piolibdeps/
+
+# Plattform.io
+.pio/
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
