@@ -2,6 +2,20 @@ WT32SC01 display with Esphome and Home-Assistant
 ================================================
 Example config for a WT32SC01 ( WT32-SC01 with ESP32 WRover module ) display using Esphome, controlling Home Assistant entities and using Home Assistant sensors to display Meteo forecast, temperatures,....
 
+## Sägesteuerung (saegesteuerung.yaml)
+Dark-Mode UI für eine Werkstatt-Sägesteuerung mit zwei großen Toggle-Buttons im Kapsel/Pill-Design:
+- **SÄGE** – schaltet `switch.saege` in Home Assistant
+- **ABSAUGUNG** – schaltet `switch.absaugung` in Home Assistant
+
+### Anpassung
+In der Datei `saegesteuerung.yaml` unter `substitutions` die Entitäten anpassen:
+```yaml
+switch1_entity: "switch.saege"       # Deine Säge-Entität
+switch2_entity: "switch.absaugung"   # Deine Absaugung-Entität
+```
+Außerdem `ip_saegesteuerung` in deiner `secrets.yaml` anlegen.
+
+## Original Wetter-Dashboard (wt32sc01a.yaml / wt32sc01b.yaml)
 The meteo forecaste part is depending on a template sensor in Home Assistant. See ./sensor_ha/forecast_8hours.yaml. 
 The images in ./images/weather1 should be places in the home assistant config/esphome/images/weather1 folder 
 
