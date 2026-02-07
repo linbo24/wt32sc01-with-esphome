@@ -61,6 +61,25 @@ wifi:
     ssid: "${name} Fallback"
     password: !secret esphome_fb_pw
 
+# ==================
+# Globals fuer Slide-Animation
+# anim_step: 0 = idle, 1..6 = Animationsframe
+# anim_dir:  1 = slide rechts (AN), -1 = slide links (AUS)
+# ==================
+globals:
+  - id: anim_step_1
+    type: int
+    initial_value: '0'
+  - id: anim_dir_1
+    type: int
+    initial_value: '1'
+  - id: anim_step_2
+    type: int
+    initial_value: '0'
+  - id: anim_dir_2
+    type: int
+    initial_value: '1'
+
 switch:
   - platform: template
     name: "Säge"
@@ -69,9 +88,13 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - component.update: ${id_prefix}_display
+      - globals.set: {id: anim_dir_1, value: '1'}
+      - globals.set: {id: anim_step_1, value: '1'}
+      - script.execute: animate_1
     on_turn_off:
-      - component.update: ${id_prefix}_display
+      - globals.set: {id: anim_dir_1, value: '-1'}
+      - globals.set: {id: anim_step_1, value: '1'}
+      - script.execute: animate_1
 
   - platform: template
     name: "Absaugung"
@@ -80,9 +103,13 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - component.update: ${id_prefix}_display
+      - globals.set: {id: anim_dir_2, value: '1'}
+      - globals.set: {id: anim_step_2, value: '1'}
+      - script.execute: animate_2
     on_turn_off:
-      - component.update: ${id_prefix}_display
+      - globals.set: {id: anim_dir_2, value: '-1'}
+      - globals.set: {id: anim_step_2, value: '1'}
+      - script.execute: animate_2
 
 script:
   - id: undim_script
@@ -105,6 +132,48 @@ script:
     mode: single
     then:
       - switch.toggle: sw_absaugung
+
+  # Slide-Animation Switch 1: 5 Frames, nur bei Toggle
+  - id: animate_1
+    mode: restart
+    then:
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_1, value: '2'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_1, value: '3'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_1, value: '4'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_1, value: '5'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_1, value: '0'}
+      - component.update: ${id_prefix}_display
+
+  # Slide-Animation Switch 2: 5 Frames, nur bei Toggle
+  - id: animate_2
+    mode: restart
+    then:
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_2, value: '2'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_2, value: '3'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_2, value: '4'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_2, value: '5'}
+      - component.update: ${id_prefix}_display
+      - delay: 30ms
+      - globals.set: {id: anim_step_2, value: '0'}
+      - component.update: ${id_prefix}_display
 
 output:
   - platform: ledc
@@ -157,56 +226,152 @@ display:
     pages:
       - id: main_page
         lambda: |-
+          // ========================================
+          // SAEGESTEUERUNG – Slider-Toggle Dark UI
+          // 480x320, Landscape
+          // ========================================
           it.fill(bg_dark);
           
-          // Header
-          it.print(240, 28, id(fnt32), col_white, TextAlign::TOP_CENTER, "SAEGESTEUERUNG");
+          // ---- Header ----
+          it.print(240, 20, id(fnt28), col_white, TextAlign::TOP_CENTER, "SAEGESTEUERUNG");
           
-          // Button-Layout: zentriert, Platz fuer Status-Text rechts
-          int pw = 300;
-          int ph = 70;
-          int px = 40;
-          int py1 = 95;
-          int py2 = 205;
-          int sx = px + pw + 16;
+          // ---- Slider-Toggle Dimensions ----
+          // Track: die lange Pill-Bahn
+          // Knob: der runde Slider-Kreis
+          int tx = 50;           // Track links-X
+          int tw = 380;          // Track Breite
+          int th = 70;           // Track Hoehe
+          int tr = th / 2;       // Track Ecken-Radius
+          int ty1 = 80;          // Track 1 Y (Saege)
+          int ty2 = 200;         // Track 2 Y (Absaugung)
           
-          // === SAEGE ===
-          if (id(sw_saege).state) {
-            it.filled_rectangle(px, py1, pw, ph, col_mint);
-            it.image(px + 20, py1 + 15, id(imgSaege), bg_dark);
-            it.print(px + 72, py1 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "SAEGE");
-            it.print(sx, py1 + 35, id(fnt22), col_mint, TextAlign::CENTER_LEFT, "AN");
+          int knob_d = 58;       // Knob Durchmesser
+          int knob_r = knob_d / 2;
+          int knob_pad = 6;      // Abstand Knob zum Track-Rand
+          int knob_y_off = (th - knob_d) / 2;  // Vertikal zentriert
+          
+          // Knob X-Positionen: links (AUS) und rechts (AN)
+          int knob_left = tx + knob_pad;
+          int knob_right = tx + tw - knob_d - knob_pad;
+          int knob_travel = knob_right - knob_left;
+          
+          // Icon/Label Positionen im Track
+          int icon_y_off = (th - 36) / 2;  // 36px Icon zentriert
+          int label_off = 46;               // Label Offset nach Icon
+          
+          // =========================================
+          // Hilfsfunktion: Knob-Position berechnen
+          // Bei Animation: Interpolation ueber 5 Steps
+          // anim_step 0 = idle (Endposition)
+          // anim_step 1..5 = Zwischenpositionen
+          // anim_dir 1 = nach rechts, -1 = nach links
+          // =========================================
+          
+          // ---- SLIDER 1: SAEGE ----
+          bool s1_on = id(sw_saege).state;
+          int a1 = id(anim_step_1);
+          int d1 = id(anim_dir_1);
+          int knob_x1;
+          if (a1 == 0) {
+            knob_x1 = s1_on ? knob_right : knob_left;
           } else {
-            it.rectangle(px, py1, pw, ph, col_mint);
-            it.image(px + 20, py1 + 15, id(imgSaege), col_light_grey);
-            it.print(px + 72, py1 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "SAEGE");
-            it.print(sx, py1 + 35, id(fnt22), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
+            // Animation: von Start zu Ziel interpolieren
+            float progress = (float)a1 / 5.0f;
+            if (d1 > 0) {
+              knob_x1 = knob_left + (int)(progress * knob_travel);
+            } else {
+              knob_x1 = knob_right - (int)(progress * knob_travel);
+            }
           }
           
-          // Trennlinie
-          it.horizontal_line(60, 185, 360, col_dark_grey);
+          // Track zeichnen
+          Color track_col1 = (s1_on || a1 > 0) ? col_track_on : col_track_off;
+          // Wenn Animation nach AUS laeuft, Track noch teilweise gruen
+          if (a1 > 0 && d1 < 0) {
+            float fade = 1.0f - ((float)a1 / 5.0f);
+            // Einfach: Track bleibt gruen waehrend Animation
+            track_col1 = col_track_on;
+            if (a1 >= 4) track_col1 = col_track_off;
+          }
+          // Track Hintergrund (Pill-Form: Kreise links+rechts + Rechteck mitte)
+          it.filled_circle(tx + tr, ty1 + tr, tr, track_col1);
+          it.filled_circle(tx + tw - tr, ty1 + tr, tr, track_col1);
+          it.filled_rectangle(tx + tr, ty1, tw - th, th, track_col1);
           
-          // === ABSAUGUNG ===
-          if (id(sw_absaugung).state) {
-            it.filled_rectangle(px, py2, pw, ph, col_mint);
-            it.image(px + 20, py2 + 15, id(imgAbsaugung), bg_dark);
-            it.print(px + 72, py2 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "ABSAUGUNG");
-            it.print(sx, py2 + 35, id(fnt22), col_mint, TextAlign::CENTER_LEFT, "AN");
+          // Icon + Label im Track (gegenueber vom Knob)
+          if (s1_on || (a1 > 0 && d1 > 0)) {
+            // AN oder animiert nach AN: Icon+Label links
+            it.image(tx + 18, ty1 + icon_y_off, id(imgSaege), col_white);
+            it.print(tx + 18 + label_off, ty1 + tr, id(fnt22), col_white, TextAlign::CENTER_LEFT, "SAEGE");
           } else {
-            it.rectangle(px, py2, pw, ph, col_mint);
-            it.image(px + 20, py2 + 15, id(imgAbsaugung), col_light_grey);
-            it.print(px + 72, py2 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "ABSAUGUNG");
-            it.print(sx, py2 + 35, id(fnt22), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
+            // AUS: Icon+Label rechts
+            it.image(tx + tw - 18 - 36 - label_off - 40, ty1 + icon_y_off, id(imgSaege), col_grey);
+            it.print(tx + tw - 18 - 36, ty1 + tr, id(fnt22), col_grey, TextAlign::CENTER_RIGHT, "SAEGE");
+          }
+          
+          // Knob (weisser Kreis)
+          int kcx1 = knob_x1 + knob_r;
+          int kcy1 = ty1 + knob_y_off + knob_r;
+          it.filled_circle(kcx1, kcy1, knob_r, col_white);
+          // Status-Text im Knob
+          if (s1_on && a1 == 0) {
+            it.print(kcx1, kcy1, id(fnt18), col_knob_on, TextAlign::CENTER, "AN");
+          } else if (!s1_on && a1 == 0) {
+            it.print(kcx1, kcy1, id(fnt18), col_knob_off, TextAlign::CENTER, "AUS");
+          }
+          
+          // ---- Trennlinie ----
+          it.horizontal_line(80, 178, 320, col_separator);
+          
+          // ---- SLIDER 2: ABSAUGUNG ----
+          bool s2_on = id(sw_absaugung).state;
+          int a2 = id(anim_step_2);
+          int d2 = id(anim_dir_2);
+          int knob_x2;
+          if (a2 == 0) {
+            knob_x2 = s2_on ? knob_right : knob_left;
+          } else {
+            float progress = (float)a2 / 5.0f;
+            if (d2 > 0) {
+              knob_x2 = knob_left + (int)(progress * knob_travel);
+            } else {
+              knob_x2 = knob_right - (int)(progress * knob_travel);
+            }
+          }
+          
+          Color track_col2 = (s2_on || a2 > 0) ? col_track_on : col_track_off;
+          if (a2 > 0 && d2 < 0) {
+            track_col2 = col_track_on;
+            if (a2 >= 4) track_col2 = col_track_off;
+          }
+          it.filled_circle(tx + tr, ty2 + tr, tr, track_col2);
+          it.filled_circle(tx + tw - tr, ty2 + tr, tr, track_col2);
+          it.filled_rectangle(tx + tr, ty2, tw - th, th, track_col2);
+          
+          if (s2_on || (a2 > 0 && d2 > 0)) {
+            it.image(tx + 18, ty2 + icon_y_off, id(imgAbsaugung), col_white);
+            it.print(tx + 18 + label_off, ty2 + tr, id(fnt22), col_white, TextAlign::CENTER_LEFT, "ABSAUGUNG");
+          } else {
+            it.image(tx + tw - 18 - 36 - label_off - 80, ty2 + icon_y_off, id(imgAbsaugung), col_grey);
+            it.print(tx + tw - 18 - 36, ty2 + tr, id(fnt22), col_grey, TextAlign::CENTER_RIGHT, "ABSAUGUNG");
+          }
+          
+          int kcx2 = knob_x2 + knob_r;
+          int kcy2 = ty2 + knob_y_off + knob_r;
+          it.filled_circle(kcx2, kcy2, knob_r, col_white);
+          if (s2_on && a2 == 0) {
+            it.print(kcx2, kcy2, id(fnt18), col_knob_on, TextAlign::CENTER, "AN");
+          } else if (!s2_on && a2 == 0) {
+            it.print(kcx2, kcy2, id(fnt18), col_knob_off, TextAlign::CENTER, "AUS");
+          }
+          
+          // ---- Footer: Wifi-Punkt ----
+          if (id(${id_prefix}_wifi).has_state()) {
+            Color wc = (id(${id_prefix}_wifi).state > -65) ? col_track_on : col_knob_off;
+            it.filled_circle(240, 305, 4, wc);
           }
 
 font:
-  - file:
-      type: gfonts
-      family: "Roboto"
-      weight: bold
-    id: fnt32
-    size: 32
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "
   - file:
       type: gfonts
       family: "Roboto"
@@ -220,39 +385,66 @@ font:
       weight: bold
     id: fnt22
     size: 22
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+  - file:
+      type: gfonts
+      family: "Roboto"
+      weight: bold
+    id: fnt18
+    size: 18
     glyphs: "ANUSO "
 
 color:
+  # Hintergrund
   - id: bg_dark
     red: 4%
     green: 5%
     blue: 8%
-  - id: col_mint
+  # Track AN (sattes Tuerkis)
+  - id: col_track_on
     red: 10%
-    green: 74%
-    blue: 61%
+    green: 65%
+    blue: 50%
+  # Track AUS (dunkles Grau)
+  - id: col_track_off
+    red: 15%
+    green: 17%
+    blue: 20%
+  # Weiss (Knob + Header)
   - id: col_white
     red: 100%
     green: 100%
     blue: 100%
-  - id: col_light_grey
-    red: 65%
+  # Label-Grau (AUS-Zustand)
+  - id: col_grey
+    red: 50%
+    green: 52%
+    blue: 55%
+  # Knob-Text AN (Tuerkis)
+  - id: col_knob_on
+    red: 10%
     green: 65%
-    blue: 65%
-  - id: col_dark_grey
-    red: 25%
-    green: 25%
-    blue: 30%
+    blue: 50%
+  # Knob-Text AUS (dunkelgrau)
+  - id: col_knob_off
+    red: 45%
+    green: 45%
+    blue: 48%
+  # Trennlinie
+  - id: col_separator
+    red: 18%
+    green: 20%
+    blue: 24%
 
 image:
   - file: mdi:saw-blade
     id: imgSaege
-    resize: 40x40
-    type: BINARY
+    resize: 36x36
+    type: TRANSPARENT_BINARY
   - file: mdi:fan
     id: imgAbsaugung
-    resize: 40x40
-    type: BINARY
+    resize: 36x36
+    type: TRANSPARENT_BINARY
 
 sensor:
   - platform: wifi_signal
@@ -262,19 +454,15 @@ sensor:
     update_interval: 120s
 
 binary_sensor:
-  # Touch: nach swap_xy+mirror_y auf dem WT32-SC01 im Landscape:
-  #   x = horizontal (0=links, 480=rechts)
-  #   y = vertikal   (0=oben, 320=unten)
-  # Button 1 (Saege):     x=30..350, y=85..175
-  # Button 2 (Absaugung): x=30..350, y=195..285
+  # Touch-Bereiche deckungsgleich mit den Tracks
   - platform: touchscreen
     id: touch_saege
     internal: true
     page_id: main_page
-    x_min: 30
-    x_max: 350
-    y_min: 85
-    y_max: 175
+    x_min: 40
+    x_max: 440
+    y_min: 75
+    y_max: 155
     on_press:
       - script.execute: toggle_switch1
 
@@ -282,9 +470,9 @@ binary_sensor:
     id: touch_absaugung
     internal: true
     page_id: main_page
-    x_min: 30
-    x_max: 350
+    x_min: 40
+    x_max: 440
     y_min: 195
-    y_max: 285
+    y_max: 275
     on_press:
       - script.execute: toggle_switch2
