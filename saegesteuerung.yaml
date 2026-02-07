@@ -43,8 +43,6 @@ logger:
   baud_rate: 0
 
 api:
-  encryption:
-    key: !secret ha_defaultkey
 
 ota:
   - platform: esphome
@@ -53,6 +51,7 @@ ota:
 wifi:
   ssid: !secret wifi_ssid_iot
   password: !secret wifi_pw_iot
+  power_save_mode: NONE
   manual_ip:
     static_ip: !secret ip_saegesteuerung
     gateway: !secret ip_iot_gateway
@@ -107,10 +106,6 @@ script:
     then:
       - switch.toggle: sw_absaugung
 
-time:
-  - platform: homeassistant
-    id: homeassistant_time
-
 output:
   - platform: ledc
     pin: GPIO23
@@ -162,46 +157,45 @@ display:
     pages:
       - id: main_page
         lambda: |-
-          // Hintergrund
           it.fill(bg_dark);
           
           // Header
           it.print(240, 28, id(fnt32), col_white, TextAlign::TOP_CENTER, "SAEGESTEUERUNG");
           
-          // Pill-Dimensionen
-          int pw = 340;
+          // Button-Layout: zentriert, Platz fuer Status-Text rechts
+          int pw = 300;
           int ph = 70;
-          int px = 70;
-          int py1 = 90;
-          int py2 = 200;
-          int sx = px + pw + 10;
+          int px = 40;
+          int py1 = 95;
+          int py2 = 205;
+          int sx = px + pw + 16;
           
           // === SAEGE ===
           if (id(sw_saege).state) {
             it.filled_rectangle(px, py1, pw, ph, col_mint);
-            it.image(px + 16, py1 + 15, id(imgSaege), bg_dark);
-            it.print(px + 68, py1 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "SAEGE");
+            it.image(px + 20, py1 + 15, id(imgSaege), bg_dark);
+            it.print(px + 72, py1 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "SAEGE");
             it.print(sx, py1 + 35, id(fnt22), col_mint, TextAlign::CENTER_LEFT, "AN");
           } else {
             it.rectangle(px, py1, pw, ph, col_mint);
-            it.image(px + 16, py1 + 15, id(imgSaege), col_light_grey);
-            it.print(px + 68, py1 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "SAEGE");
+            it.image(px + 20, py1 + 15, id(imgSaege), col_light_grey);
+            it.print(px + 72, py1 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "SAEGE");
             it.print(sx, py1 + 35, id(fnt22), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
           }
           
           // Trennlinie
-          it.horizontal_line(100, 180, 280, col_dark_grey);
+          it.horizontal_line(60, 185, 360, col_dark_grey);
           
           // === ABSAUGUNG ===
           if (id(sw_absaugung).state) {
             it.filled_rectangle(px, py2, pw, ph, col_mint);
-            it.image(px + 16, py2 + 15, id(imgAbsaugung), bg_dark);
-            it.print(px + 68, py2 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "ABSAUGUNG");
+            it.image(px + 20, py2 + 15, id(imgAbsaugung), bg_dark);
+            it.print(px + 72, py2 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "ABSAUGUNG");
             it.print(sx, py2 + 35, id(fnt22), col_mint, TextAlign::CENTER_LEFT, "AN");
           } else {
             it.rectangle(px, py2, pw, ph, col_mint);
-            it.image(px + 16, py2 + 15, id(imgAbsaugung), col_light_grey);
-            it.print(px + 68, py2 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "ABSAUGUNG");
+            it.image(px + 20, py2 + 15, id(imgAbsaugung), col_light_grey);
+            it.print(px + 72, py2 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "ABSAUGUNG");
             it.print(sx, py2 + 35, id(fnt22), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
           }
 
@@ -265,17 +259,22 @@ sensor:
     name: "${id_prefix}_wifi"
     id: "${id_prefix}_wifi"
     internal: true
-    update_interval: 60s
+    update_interval: 120s
 
 binary_sensor:
+  # Touch: nach swap_xy+mirror_y auf dem WT32-SC01 im Landscape:
+  #   x = horizontal (0=links, 480=rechts)
+  #   y = vertikal   (0=oben, 320=unten)
+  # Button 1 (Saege):     x=30..350, y=85..175
+  # Button 2 (Absaugung): x=30..350, y=195..285
   - platform: touchscreen
     id: touch_saege
     internal: true
     page_id: main_page
-    x_min: 80
-    x_max: 170
-    y_min: 60
-    y_max: 420
+    x_min: 30
+    x_max: 350
+    y_min: 85
+    y_max: 175
     on_press:
       - script.execute: toggle_switch1
 
@@ -283,9 +282,9 @@ binary_sensor:
     id: touch_absaugung
     internal: true
     page_id: main_page
-    x_min: 190
-    x_max: 280
-    y_min: 60
-    y_max: 420
+    x_min: 30
+    x_max: 350
+    y_min: 195
+    y_max: 285
     on_press:
       - script.execute: toggle_switch2
