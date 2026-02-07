@@ -1,9 +1,6 @@
 # ============================================
 # Sägesteuerung - WT32-SC01 Display mit ESPHome
-# Dark Mode UI mit zwei Toggle-Buttons
-# (Säge & Absaugung)
-# Die Switches leben direkt auf dem Gerät und
-# erscheinen automatisch in Home Assistant.
+# Optimiert für minimale CPU-Last & schnelle Reaktion
 #
 # Nutzung als Remote-Package:
 #   packages:
@@ -39,10 +36,11 @@ psram:
   speed: 80MHz
 
 preferences:
-  flash_write_interval: 15min
+  flash_write_interval: 60min
 
 logger:
-  level: ERROR
+  level: WARN
+  baud_rate: 0
 
 api:
   encryption:
@@ -64,12 +62,6 @@ wifi:
     ssid: "${name} Fallback"
     password: !secret esphome_fb_pw
 
-# ==================
-# Switches (lokal auf dem Gerät)
-# Erscheinen automatisch als Entitäten in HA:
-#   switch.saegesteuerung_saege
-#   switch.saegesteuerung_absaugung
-# ==================
 switch:
   - platform: template
     name: "Säge"
@@ -93,9 +85,6 @@ switch:
     on_turn_off:
       - component.update: ${id_prefix}_display
 
-# ==================
-# Scripts
-# ==================
 script:
   - id: undim_script
     mode: restart
@@ -118,16 +107,10 @@ script:
     then:
       - switch.toggle: sw_absaugung
 
-# ==================
-# Time
-# ==================
 time:
   - platform: homeassistant
     id: homeassistant_time
 
-# ==================
-# Backlight
-# ==================
 output:
   - platform: ledc
     pin: GPIO23
@@ -140,9 +123,6 @@ light:
     id: ${id_prefix}_backlight
     restore_mode: RESTORE_DEFAULT_OFF
 
-# ==================
-# I2C & Touch
-# ==================
 i2c:
   id: i2c_bus_intern
   sda: 18
@@ -160,9 +140,6 @@ touchscreen:
     on_touch:
       - script.execute: undim_script
 
-# ==================
-# SPI & Display
-# ==================
 spi:
   clk_pin: GPIO14
   mosi_pin: GPIO13
@@ -181,126 +158,76 @@ display:
     dimensions:
       width: 480
       height: 320
+    update_interval: never
     pages:
       - id: main_page
         lambda: |-
-          // =============================
-          // SÄGESTEUERUNG - Dark Mode UI
-          // Display: 480 x 320 px
-          // =============================
+          // Hintergrund
+          it.fill(bg_dark);
           
-          // -- Hintergrund (#0A0E14) --
-          it.filled_rectangle(0, 0, 480, 320, bg_dark);
+          // Header
+          it.print(240, 28, id(fnt32), col_white, TextAlign::TOP_CENTER, "SAEGESTEUERUNG");
           
-          // -- Header: "SAEGESTEUERUNG" --
-          it.printf(240, 30, id(fntHeader), col_white, TextAlign::TOP_CENTER, "SAEGESTEUERUNG");
+          // Pill-Dimensionen
+          int pw = 340;
+          int ph = 70;
+          int px = 70;
+          int py1 = 90;
+          int py2 = 200;
+          int sx = px + pw + 10;
           
-          // -- Pill-Button Dimensionen --
-          uint16_t pill_w = 336;
-          uint16_t pill_h = 70;
-          uint16_t pill_r = 35;
-          uint16_t pill_x = (480 - pill_w) / 2;  // = 72
-          uint16_t pill_y1 = 90;   // Erste Kapsel (Säge)
-          uint16_t pill_y2 = 200;  // Zweite Kapsel (Absaugung)
-          
-          uint16_t icon_x = pill_x + 16;
-          uint16_t icon_y_offset = (pill_h - 40) / 2;
-          uint16_t label_x = pill_x + 70;
-          uint16_t status_x = pill_x + pill_w + 12;
-          
-          // ================================
-          // TOGGLE 1: SÄGE (lokaler State)
-          // ================================
-          bool saege_on = id(sw_saege).state;
-          
-          if (saege_on) {
-            it.filled_circle(pill_x + pill_r, pill_y1 + pill_r, pill_r, col_mint);
-            it.filled_circle(pill_x + pill_w - pill_r, pill_y1 + pill_r, pill_r, col_mint);
-            it.filled_rectangle(pill_x + pill_r, pill_y1, pill_w - 2 * pill_r, pill_h, col_mint);
-            it.image(icon_x, pill_y1 + icon_y_offset, id(imgSaege), bg_dark);
-            it.printf(label_x, pill_y1 + pill_h / 2, id(fntButton), bg_dark, TextAlign::CENTER_LEFT, "SAEGE");
-            it.printf(status_x, pill_y1 + pill_h / 2, id(fntStatus), col_mint, TextAlign::CENTER_LEFT, "AN");
+          // === SAEGE ===
+          if (id(sw_saege).state) {
+            it.filled_rectangle(px, py1, pw, ph, col_mint);
+            it.image(px + 16, py1 + 15, id(imgSaege), bg_dark);
+            it.print(px + 68, py1 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "SAEGE");
+            it.print(sx, py1 + 35, id(fnt22), col_mint, TextAlign::CENTER_LEFT, "AN");
           } else {
-            it.circle(pill_x + pill_r, pill_y1 + pill_r, pill_r, col_mint);
-            it.circle(pill_x + pill_w - pill_r, pill_y1 + pill_r, pill_r, col_mint);
-            it.line(pill_x + pill_r, pill_y1, pill_x + pill_w - pill_r, pill_y1, col_mint);
-            it.line(pill_x + pill_r, pill_y1 + pill_h, pill_x + pill_w - pill_r, pill_y1 + pill_h, col_mint);
-            it.image(icon_x, pill_y1 + icon_y_offset, id(imgSaege), col_light_grey);
-            it.printf(label_x, pill_y1 + pill_h / 2, id(fntButton), col_white, TextAlign::CENTER_LEFT, "SAEGE");
-            it.printf(status_x, pill_y1 + pill_h / 2, id(fntStatus), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
+            it.rectangle(px, py1, pw, ph, col_mint);
+            it.image(px + 16, py1 + 15, id(imgSaege), col_light_grey);
+            it.print(px + 68, py1 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "SAEGE");
+            it.print(sx, py1 + 35, id(fnt22), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
           }
           
-          // ================================
-          // TOGGLE 2: ABSAUGUNG (lokaler State)
-          // ================================
-          bool absaug_on = id(sw_absaugung).state;
+          // Trennlinie
+          it.horizontal_line(100, 180, 280, col_dark_grey);
           
-          if (absaug_on) {
-            it.filled_circle(pill_x + pill_r, pill_y2 + pill_r, pill_r, col_mint);
-            it.filled_circle(pill_x + pill_w - pill_r, pill_y2 + pill_r, pill_r, col_mint);
-            it.filled_rectangle(pill_x + pill_r, pill_y2, pill_w - 2 * pill_r, pill_h, col_mint);
-            it.image(icon_x, pill_y2 + icon_y_offset, id(imgAbsaugung), bg_dark);
-            it.printf(label_x, pill_y2 + pill_h / 2, id(fntButton), bg_dark, TextAlign::CENTER_LEFT, "ABSAUGUNG");
-            it.printf(status_x, pill_y2 + pill_h / 2, id(fntStatus), col_mint, TextAlign::CENTER_LEFT, "AN");
+          // === ABSAUGUNG ===
+          if (id(sw_absaugung).state) {
+            it.filled_rectangle(px, py2, pw, ph, col_mint);
+            it.image(px + 16, py2 + 15, id(imgAbsaugung), bg_dark);
+            it.print(px + 68, py2 + 35, id(fnt28), bg_dark, TextAlign::CENTER_LEFT, "ABSAUGUNG");
+            it.print(sx, py2 + 35, id(fnt22), col_mint, TextAlign::CENTER_LEFT, "AN");
           } else {
-            it.circle(pill_x + pill_r, pill_y2 + pill_r, pill_r, col_mint);
-            it.circle(pill_x + pill_w - pill_r, pill_y2 + pill_r, pill_r, col_mint);
-            it.line(pill_x + pill_r, pill_y2, pill_x + pill_w - pill_r, pill_y2, col_mint);
-            it.line(pill_x + pill_r, pill_y2 + pill_h, pill_x + pill_w - pill_r, pill_y2 + pill_h, col_mint);
-            it.image(icon_x, pill_y2 + icon_y_offset, id(imgAbsaugung), col_light_grey);
-            it.printf(label_x, pill_y2 + pill_h / 2, id(fntButton), col_white, TextAlign::CENTER_LEFT, "ABSAUGUNG");
-            it.printf(status_x, pill_y2 + pill_h / 2, id(fntStatus), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
-          }
-          
-          // -- Trennlinie zwischen den Buttons --
-          it.line(100, 175, 380, 175, col_dark_grey);
-          
-          // -- WiFi-Status unten links --
-          uint16_t wfx = 10;
-          uint16_t wfy = 290;
-          if (id(${id_prefix}_wifi).has_state()) {
-            if (id(${id_prefix}_wifi).state < -70) {
-              it.image(wfx, wfy, id(imgWifi1), col_yellow);
-            } else if (id(${id_prefix}_wifi).state < -60) {
-              it.image(wfx, wfy, id(imgWifi2), col_mint);
-            } else if (id(${id_prefix}_wifi).state < -50) {
-              it.image(wfx, wfy, id(imgWifi3), col_mint);
-            } else {
-              it.image(wfx, wfy, id(imgWifi4), col_mint);
-            }
-          } else {
-            it.image(wfx, wfy, id(imgWifi0), col_red);
+            it.rectangle(px, py2, pw, ph, col_mint);
+            it.image(px + 16, py2 + 15, id(imgAbsaugung), col_light_grey);
+            it.print(px + 68, py2 + 35, id(fnt28), col_white, TextAlign::CENTER_LEFT, "ABSAUGUNG");
+            it.print(sx, py2 + 35, id(fnt22), col_light_grey, TextAlign::CENTER_LEFT, "AUS");
           }
 
-# ==================
-# Fonts
-# ==================
 font:
   - file:
       type: gfonts
-      family: "Roboto Condensed"
+      family: "Roboto"
       weight: bold
-    id: fntHeader
+    id: fnt32
     size: 32
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜabcdefghijklmnopqrstuvwxyzäöü0123456789 .-:!?"
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "
   - file:
       type: gfonts
       family: "Roboto"
       weight: bold
-    id: fntButton
+    id: fnt28
     size: 28
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜabcdefghijklmnopqrstuvwxyzäöü0123456789 .-:!?"
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
   - file:
       type: gfonts
       family: "Roboto"
       weight: bold
-    id: fntStatus
+    id: fnt22
     size: 22
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜabcdefghijklmnopqrstuvwxyzäöü0123456789 .-:!?"
+    glyphs: "ANUSO "
 
-# ==================
-# Colors
-# ==================
 color:
   - id: bg_dark
     red: 4%
@@ -322,68 +249,24 @@ color:
     red: 25%
     green: 25%
     blue: 30%
-  - id: col_red
-    red: 100%
-    green: 25%
-    blue: 25%
-  - id: col_yellow
-    red: 75%
-    green: 75%
-    blue: 0%
 
-# ==================
-# Images (MDI Icons – keine lokalen Dateien nötig)
-# ==================
 image:
   - file: mdi:saw-blade
     id: imgSaege
     resize: 40x40
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
+    type: BINARY
   - file: mdi:fan
     id: imgAbsaugung
     resize: 40x40
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
-  - file: mdi:wifi-strength-alert-outline
-    id: imgWifi0
-    resize: 24x24
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
-  - file: mdi:wifi-strength-1
-    id: imgWifi1
-    resize: 24x24
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
-  - file: mdi:wifi-strength-2
-    id: imgWifi2
-    resize: 24x24
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
-  - file: mdi:wifi-strength-3
-    id: imgWifi3
-    resize: 24x24
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
-  - file: mdi:wifi-strength-4
-    id: imgWifi4
-    resize: 24x24
-    dither: FLOYDSTEINBERG
-    type: GRAYSCALE
+    type: BINARY
 
-# ==================
-# Sensors
-# ==================
 sensor:
   - platform: wifi_signal
     name: "${id_prefix}_wifi"
     id: "${id_prefix}_wifi"
     internal: true
-    update_interval: 10s
+    update_interval: 60s
 
-# ==================
-# Binary Sensors (Touch – inline, kein !include)
-# ==================
 binary_sensor:
   - platform: touchscreen
     id: touch_saege
