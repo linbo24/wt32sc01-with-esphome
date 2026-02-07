@@ -16,6 +16,8 @@ Zwei große Toggle-Buttons im Kapsel/Pill-Design steuern **Säge** und **Absaugu
 - **Offline-fähig** – Funktioniert auch ohne Home Assistant Verbindung
 - **Auto-Dimming** – Display dimmt nach 30s Inaktivität automatisch herunter
 - **WiFi-Statusanzeige** – Kleine Anzeige unten links
+- **Remote-Package** – Direkt aus GitHub in ESPHome einbindbar, keine lokalen Dateien nötig
+- **Nur MDI-Icons** – Keine externen Bilddateien erforderlich
 
 ---
 
@@ -28,62 +30,70 @@ Zwei große Toggle-Buttons im Kapsel/Pill-Design steuern **Säge** und **Absaugu
 
 ## 🚀 Installation
 
-### 1. Repository klonen
+### 1. Secrets in ESPHome anlegen
 
-```bash
-git clone https://github.com/DEIN_USERNAME/ESP-SaegeDisplay.git
-cd ESP-SaegeDisplay/wt32sc01-with-esphome
-```
-
-### 2. Secrets anlegen
-
-Kopiere die Beispiel-Datei und trage deine echten Werte ein:
-
-```bash
-cp secrets.yaml.example secrets.yaml
-```
-
-Öffne `secrets.yaml` und passe an:
+In deiner **lokalen** `secrets.yaml` im ESPHome-Verzeichnis (auf dem HA-Server) müssen folgende Einträge existieren:
 
 ```yaml
-ha_defaultkey: "DEIN_BASE64_API_KEY"     # HA API-Schlüssel
-esphome_ota_pw: "dein_ota_passwort"       # OTA-Update Passwort
-wifi_ssid_iot: "DEIN_WLAN_NAME"           # WiFi SSID
-wifi_pw_iot: "DEIN_WLAN_PASSWORT"         # WiFi Passwort
-ip_saegesteuerung: "192.168.1.100"        # Statische IP des Displays
-ip_iot_gateway: "192.168.1.1"             # Gateway
-ip_iot_subnet: "255.255.255.0"            # Subnetz
-ip_iot_dns: "192.168.1.1"                 # DNS Server
-esphome_fb_pw: "fallback_passwort"        # Fallback-Hotspot Passwort
+ha_defaultkey: "DEIN_BASE64_API_KEY"      # HA API-Schlüssel
+esphome_ota_pw: "dein_ota_passwort"        # OTA-Update Passwort
+wifi_ssid_iot: "DEIN_WLAN_NAME"            # WiFi SSID
+wifi_pw_iot: "DEIN_WLAN_PASSWORT"          # WiFi Passwort
+ip_saegesteuerung: "192.168.1.100"         # Statische IP des Displays
+ip_iot_gateway: "192.168.1.1"              # Gateway
+ip_iot_subnet: "255.255.255.0"             # Subnetz
+ip_iot_dns: "192.168.1.1"                  # DNS Server
+esphome_fb_pw: "fallback_passwort"         # Fallback-Hotspot Passwort
 ```
 
-> ⚠️ **`secrets.yaml` wird per `.gitignore` nicht committed – deine Zugangsdaten sind sicher.**
+Eine Vorlage findest du in [`secrets.yaml.example`](./secrets.yaml.example).
 
-### 3. In ESPHome einbinden
+### 2. ESPHome-Config erstellen
 
-**Variante A – ESPHome Dashboard (empfohlen):**
+Erstelle eine neue Datei in deinem ESPHome-Dashboard (z.B. `saege.yaml`) mit folgendem Inhalt:
 
-1. Kopiere den gesamten Ordner `wt32sc01-with-esphome/` in dein ESPHome-Konfigurationsverzeichnis (normalerweise `~/config/esphome/` oder `/config/esphome/` im HA-Container)
-2. Die Datei `saegesteuerung.yaml` erscheint automatisch im ESPHome Dashboard
-3. Klicke auf **Install** → **Wirelessly** (oder **Plug into this computer** beim ersten Mal)
-
-**Variante B – ESPHome CLI:**
-
-```bash
-# Erster Flash über USB:
-esphome run saegesteuerung.yaml
-
-# Spätere Updates gehen Over-the-Air:
-esphome run saegesteuerung.yaml --device 192.168.1.100
+```yaml
+packages:
+  saege:
+    url: https://github.com/linbo24/wt32sc01-with-esphome
+    ref: main
+    files:
+      - saegesteuerung.yaml
 ```
 
-**Variante C – Als externes Paket referenzieren (fortgeschritten):**
+Das ist alles! ESPHome lädt die komplette Konfiguration automatisch aus diesem Repository.
 
-In deiner eigenen ESPHome-Config kannst du einzelne Dateien per `!include` aus diesem Repo einbinden, nachdem du es lokal geklont hast.
+### 3. Optional: Werte überschreiben
 
-### 4. In Home Assistant verbinden
+Du kannst jede Einstellung aus dem Package lokal überschreiben. Beispiel:
 
-Nach dem Flashen erscheint das Gerät automatisch in Home Assistant unter **Einstellungen → Geräte & Dienste → ESPHome**.  
+```yaml
+packages:
+  saege:
+    url: https://github.com/linbo24/wt32sc01-with-esphome
+    ref: main
+    files:
+      - saegesteuerung.yaml
+
+# Eigenen Namen vergeben:
+substitutions:
+  name: "werkstatt-display"
+  friendly_name: "Werkstatt Display"
+
+# Statische IP weglassen (DHCP nutzen):
+wifi:
+  manual_ip:
+```
+
+### 4. Flashen
+
+1. Klicke im ESPHome-Dashboard auf **Install**
+2. Beim **ersten Mal** über USB: **"Plug into this computer"**
+3. Danach geht alles **Over-the-Air** (OTA)
+
+### 5. In Home Assistant
+
+Nach dem Flashen erscheint das Gerät automatisch unter **Einstellungen → Geräte & Dienste → ESPHome**.  
 Folgende Entitäten werden **automatisch** erstellt:
 
 | Entität | Beschreibung |
@@ -98,17 +108,18 @@ Folgende Entitäten werden **automatisch** erstellt:
 
 ```
 wt32sc01-with-esphome/
-├── saegesteuerung.yaml      # ← Hauptkonfiguration Sägesteuerung
+├── saegesteuerung.yaml      # ← Hauptkonfiguration (self-contained, als Remote-Package nutzbar)
 ├── secrets.yaml.example     # Vorlage für secrets.yaml
 ├── .gitignore               # Schützt secrets.yaml vor Commit
-├── includes/
-│   ├── iTouch.yaml          # Touch-Helper (mit Debounce)
-│   └── iTouch2.yaml         # Touch-Helper (ohne Debounce)
-├── images/
-│   └── weather1/            # Wetterbilder (für Original-Dashboard)
+├── README.md
+├── unnamed.jpg              # UI-Preview
+├── includes/                # Touch-Helper (nur für Original-Dashboard)
+│   ├── iTouch.yaml
+│   └── iTouch2.yaml
+├── images/                  # Wetterbilder (nur für Original-Dashboard)
+│   └── weather1/
 ├── wt32sc01a.yaml           # Original Wetter-Dashboard Variante A
-├── wt32sc01b.yaml           # Original Wetter-Dashboard Variante B
-└── README.md
+└── wt32sc01b.yaml           # Original Wetter-Dashboard Variante B
 ```
 
 ---
@@ -117,28 +128,28 @@ wt32sc01-with-esphome/
 
 ### Andere Entitäts-Namen
 
-In `saegesteuerung.yaml` unter `substitutions`:
+Überschreibe `substitutions` in deiner lokalen Config:
 
 ```yaml
 substitutions:
-  name: "saegesteuerung"        # Gerätename (wird Teil der Entitäts-IDs)
-  friendly_name: "Sägesteuerung" # Anzeigename in HA
+  name: "mein-geraet"
+  friendly_name: "Mein Gerät"
 ```
 
 ### Statische IP entfernen
 
-Wenn du DHCP statt einer festen IP verwenden willst, entferne den `manual_ip`-Block in der `wifi:`-Sektion.
+Wenn du DHCP statt einer festen IP verwenden willst, überschreibe den `wifi`-Block ohne `manual_ip`.
 
 ### Dimming-Timeout ändern
 
-In der `undim_script`-Sektion den `delay`-Wert anpassen (Standard: 30s).
+Überschreibe die `undim_script`-Sektion mit einem anderen `delay`-Wert.
 
 ---
 
 ## 🔒 Sicherheit
 
 - `secrets.yaml` ist per `.gitignore` geschützt und wird **nicht** ins Repository committed
-- Prüfe vor jedem Commit mit `git status`, dass keine sensiblen Dateien enthalten sind
+- Alle sensiblen Daten (WiFi, API-Keys, IPs) werden über `!secret` referenziert und liegen nur lokal
 - Der Fallback-Hotspot wird nur aktiv, wenn das konfigurierte WiFi nicht erreichbar ist
 
 ---
@@ -151,7 +162,7 @@ Basiert auf dem [WT32-SC01 ESPHome-Projekt](https://community.home-assistant.io/
 
 ## 🗂 Original Wetter-Dashboard
 
-Die Dateien `wt32sc01a.yaml` und `wt32sc01b.yaml` enthalten das originale Wetter-/Smart-Home-Dashboard mit Wettervorhersage, Temperaturanzeigen und 7 Buttons. Siehe die Dateien für Details.
+Die Dateien `wt32sc01a.yaml` und `wt32sc01b.yaml` enthalten das originale Wetter-/Smart-Home-Dashboard mit Wettervorhersage, Temperaturanzeigen und 7 Buttons. Diese nutzen lokale Bilddateien und `!include`-Referenzen und sind **nicht** als Remote-Package geeignet.
 
 ![Original Dashboard](./display2.jpg)
 

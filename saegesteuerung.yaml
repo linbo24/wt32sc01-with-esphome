@@ -4,7 +4,16 @@
 # (Säge & Absaugung)
 # Die Switches leben direkt auf dem Gerät und
 # erscheinen automatisch in Home Assistant.
+#
+# Nutzung als Remote-Package:
+#   packages:
+#     saege:
+#       url: https://github.com/linbo24/wt32sc01-with-esphome
+#       ref: main
+#       files:
+#         - saegesteuerung.yaml
 # ============================================
+
 substitutions:
   name: "saegesteuerung"
   friendly_name: "Sägesteuerung"
@@ -251,16 +260,16 @@ display:
           uint16_t wfy = 290;
           if (id(${id_prefix}_wifi).has_state()) {
             if (id(${id_prefix}_wifi).state < -70) {
-              it.image(wfx, wfy, id(wifi1), col_yellow);
+              it.image(wfx, wfy, id(imgWifi1), col_yellow);
             } else if (id(${id_prefix}_wifi).state < -60) {
-              it.image(wfx, wfy, id(wifi2), col_mint);
+              it.image(wfx, wfy, id(imgWifi2), col_mint);
             } else if (id(${id_prefix}_wifi).state < -50) {
-              it.image(wfx, wfy, id(wifi3), col_mint);
+              it.image(wfx, wfy, id(imgWifi3), col_mint);
             } else {
-              it.image(wfx, wfy, id(wifi4), col_mint);
+              it.image(wfx, wfy, id(imgWifi4), col_mint);
             }
           } else {
-            it.image(wfx, wfy, id(wifi0), col_red);
+            it.image(wfx, wfy, id(imgWifi0), col_red);
           }
 
 # ==================
@@ -323,7 +332,7 @@ color:
     blue: 0%
 
 # ==================
-# Images (MDI Icons)
+# Images (MDI Icons – keine lokalen Dateien nötig)
 # ==================
 image:
   - file: mdi:saw-blade
@@ -337,27 +346,27 @@ image:
     dither: FLOYDSTEINBERG
     type: GRAYSCALE
   - file: mdi:wifi-strength-alert-outline
-    id: wifi0
+    id: imgWifi0
     resize: 24x24
     dither: FLOYDSTEINBERG
     type: GRAYSCALE
   - file: mdi:wifi-strength-1
-    id: wifi1
+    id: imgWifi1
     resize: 24x24
     dither: FLOYDSTEINBERG
     type: GRAYSCALE
   - file: mdi:wifi-strength-2
-    id: wifi2
+    id: imgWifi2
     resize: 24x24
     dither: FLOYDSTEINBERG
     type: GRAYSCALE
   - file: mdi:wifi-strength-3
-    id: wifi3
+    id: imgWifi3
     resize: 24x24
     dither: FLOYDSTEINBERG
     type: GRAYSCALE
   - file: mdi:wifi-strength-4
-    id: wifi4
+    id: imgWifi4
     resize: 24x24
     dither: FLOYDSTEINBERG
     type: GRAYSCALE
@@ -373,26 +382,27 @@ sensor:
     update_interval: 10s
 
 # ==================
-# Binary Sensors (Touch-Bereiche)
+# Binary Sensors (Touch – inline, kein !include)
 # ==================
 binary_sensor:
-  - <<: !include
-      file: includes/iTouch2.yaml
-      vars:
-        iId: "touch_saege"
-        iPg: "main_page"
-        iX1: "60"
-        iX2: "420"
-        iY1: "80"
-        iY2: "170"
-        iSc: "toggle_switch1"
-  - <<: !include
-      file: includes/iTouch2.yaml
-      vars:
-        iId: "touch_absaugung"
-        iPg: "main_page"
-        iX1: "60"
-        iX2: "420"
-        iY1: "190"
-        iY2: "280"
-        iSc: "toggle_switch2"
+  - platform: touchscreen
+    id: touch_saege
+    internal: true
+    page_id: main_page
+    x_min: 80
+    x_max: 170
+    y_min: 60
+    y_max: 420
+    on_press:
+      - script.execute: toggle_switch1
+
+  - platform: touchscreen
+    id: touch_absaugung
+    internal: true
+    page_id: main_page
+    x_min: 190
+    x_max: 280
+    y_min: 60
+    y_max: 420
+    on_press:
+      - script.execute: toggle_switch2
